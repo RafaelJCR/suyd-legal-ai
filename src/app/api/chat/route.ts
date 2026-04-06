@@ -89,12 +89,19 @@ Formato de respuesta:
 export async function POST(req: Request) {
   const { messages } = await req.json();
 
-  // 1. Obtener la última pregunta del usuario
-  const lastMessage = messages[messages.length - 1];
-  const userQuery = lastMessage.content;
+  // 1. Construir un resumen de TODA la conversación para buscar mejor
+  //    ANTES: solo buscaba con el último mensaje ("como las consigo?")
+  //    AHORA: busca con el contexto completo ("bocinas + policía + campo + música alta")
+  const userMessages = messages
+    .filter((m: { role: string }) => m.role === "user")
+    .map((m: { content: string }) => m.content);
 
-  // 2. Buscar leyes relevantes en Supabase (RAG)
-  const relevantLaws = await searchLaws(userQuery);
+  // Tomamos los últimos 3 mensajes del usuario para tener contexto
+  // sin exceder el límite del modelo de embeddings
+  const searchContext = userMessages.slice(-3).join(". ");
+
+  // 2. Buscar leyes relevantes usando el contexto completo
+  const relevantLaws = await searchLaws(searchContext);
 
   // 3. Construir el contexto con las leyes encontradas
   let legalContext = "";
