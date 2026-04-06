@@ -51,10 +51,10 @@ async function searchLaws(query: string) {
   // 1. Convertir la pregunta en un vector
   const embedding = await getEmbedding(query);
 
-  // 2. Buscar en Supabase los 5 chunks más parecidos
+  // 2. Buscar en Supabase los 8 chunks más parecidos
   const { data, error } = await supabase.rpc("search_law_chunks", {
     query_embedding: embedding,
-    match_count: 5,
+    match_count: 8,
   });
 
   if (error) {
@@ -62,29 +62,34 @@ async function searchLaws(query: string) {
     return [];
   }
 
-  return data || [];
+  // 3. Filtrar: solo quedarnos con chunks que tengan más de 40% de similitud
+  //    Esto evita traer artículos random que no tienen nada que ver
+  return (data || []).filter((chunk: { similarity: number }) => chunk.similarity > 0.4);
 }
 
 // Las instrucciones base para el LLM
 const BASE_PROMPT = `Eres un asistente legal experto en las leyes de la República Dominicana.
 Actúas como un abogado y jurista altamente capacitado.
 
-IMPORTANTE: Se te proporcionarán fragmentos reales de leyes dominicanas relevantes a la pregunta.
-DEBES basar tu respuesta en estos fragmentos. Cita el texto exacto cuando sea posible.
+REGLAS ESTRICTAS:
+- Se te proporcionarán fragmentos reales de leyes dominicanas relevantes a la pregunta.
+- SOLO cita artículos que aparezcan en los fragmentos proporcionados.
+- NUNCA inventes o cites artículos que no estén en los fragmentos.
+- Si los fragmentos no cubren la pregunta, responde con tu conocimiento general pero aclara que no encontraste la ley específica en tu base de datos.
+- NO cites artículos del Código de Trabajo para casos que no sean laborales.
+- NO cites artículos del Código Penal para casos civiles, a menos que haya un delito involucrado.
 
 Tu comportamiento:
-- Respondes en español de forma clara y accesible
+- Respondes en español de forma clara y directa
 - Cuando uses términos legales, los explicas brevemente
-- SIEMPRE citas la ley y artículo específico basándote en los fragmentos proporcionados
-- Si los fragmentos no cubren la pregunta, dilo honestamente
 - Aclaras que eres un asistente de IA y que tu orientación no sustituye un abogado licenciado
-- Preguntas detalles adicionales cuando la situación lo requiera
 
 Formato de respuesta:
-- Usa encabezados y listas para organizar la información
-- Cita textualmente los artículos relevantes de los fragmentos
-- Al final, sugiere los pasos concretos que la persona puede tomar
-- Si el caso es grave o complejo, recomienda buscar un abogado presencial`;
+- Sé conciso y directo, no repitas información
+- Usa encabezados y listas cortas
+- Cita solo los artículos relevantes de los fragmentos
+- Sugiere pasos concretos al final
+- Si el caso es grave, recomienda un abogado presencial`;
 
 export async function POST(req: Request) {
   const { messages } = await req.json();
