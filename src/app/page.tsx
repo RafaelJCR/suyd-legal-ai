@@ -26,6 +26,30 @@ export default function Home() {
         </div>
       </header>
 
+      {/* Banner de creador */}
+      <div className="px-6 py-1.5 border-b border-white/5 bg-white/[0.02]">
+        <div className="max-w-3xl mx-auto flex items-center justify-center gap-2 text-[10px] text-gray-500">
+          <span>Creado por</span>
+          <a
+            href="https://www.linkedin.com/in/rafaelcedanorijo/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-gray-300 hover:text-emerald-400 transition-colors font-medium"
+          >
+            Rafael José Cedano Rijo
+          </a>
+          <span>·</span>
+          <a
+            href="https://github.com/RafaelJCR/suyd-legal-ai"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-gray-500 hover:text-gray-300 transition-colors"
+          >
+            GitHub
+          </a>
+        </div>
+      </div>
+
       {/* Mensajes */}
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-3xl mx-auto px-6 py-6">
