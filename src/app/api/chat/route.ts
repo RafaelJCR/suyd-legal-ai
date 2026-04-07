@@ -95,16 +95,27 @@ REGLAS ABSOLUTAS para consultas legales:
 Responde en español, conciso y directo. Usa encabezados y listas cortas. Sugiere pasos concretos. Aclara siempre que tu orientación no sustituye a un abogado licenciado.`;
 
 // Detecta si la pregunta es sobre identidad/creador
+// Es agresivo: cualquier mención de "crea", "hizo", "nombre", "eres", etc.
 function isIdentityQuestion(text: string): boolean {
   const lower = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  const patterns = [
-    "quien te creo", "quien te hizo", "quien te creador", "quien es tu creador",
-    "quien eres", "que eres", "como te llamas", "cual es tu nombre", "tu nombre",
-    "que modelo eres", "que ia eres", "eres chatgpt", "eres gpt", "eres llama",
-    "eres meta", "eres claude", "eres gemini", "como te entrenaron",
-    "quien te desarrollo", "quien te programo", "tu creador"
+
+  // Palabras clave que indican pregunta sobre identidad
+  const keywords = [
+    "creo", "creas", "creaste", "creador", "creadora", "creacion", "creado",
+    "hizo", "hiciste", "hicieron",
+    "desarrollo", "desarrollaste", "desarrollador", "desarrollaron",
+    "programo", "programaste", "programador", "programaron",
+    "diseño", "disenaste", "diseñador",
+    "fabrico", "fabricaste",
+    "entrenaron", "entrenaste", "entrenamiento",
+    "rafael",
+    "tu nombre", "como te llamas", "quien eres", "que eres",
+    "que modelo", "que ia", "que llm",
+    "chatgpt", "gpt-", "llama", "meta ai", "openai", "claude", "gemini", "anthropic",
+    "tu creador", "tus creadores"
   ];
-  return patterns.some(p => lower.includes(p));
+
+  return keywords.some(k => lower.includes(k));
 }
 
 // Detecta saludos simples
