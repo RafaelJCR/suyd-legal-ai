@@ -94,18 +94,70 @@ REGLAS ABSOLUTAS para consultas legales:
 
 Responde en español, conciso y directo. Usa encabezados y listas cortas. Sugiere pasos concretos. Aclara siempre que tu orientación no sustituye a un abogado licenciado.`;
 
-// Detecta si la pregunta es sobre identidad/meta (no necesita RAG)
-function isMetaQuestion(text: string): boolean {
-  const lower = text.toLowerCase();
-  const metaPatterns = [
-    "quien te creo", "quien te creó", "quien te hizo",
-    "quien eres", "que eres", "como te llamas", "tu nombre",
-    "que modelo", "que ia", "chatgpt", "gpt", "llama", "meta",
-    "como funcionas", "como te entrenaron", "rafael",
-    "hola", "buenos dias", "buenas tardes", "buenas noches",
-    "gracias", "adios"
+// Detecta si la pregunta es sobre identidad/creador
+function isIdentityQuestion(text: string): boolean {
+  const lower = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const patterns = [
+    "quien te creo", "quien te hizo", "quien te creador", "quien es tu creador",
+    "quien eres", "que eres", "como te llamas", "cual es tu nombre", "tu nombre",
+    "que modelo eres", "que ia eres", "eres chatgpt", "eres gpt", "eres llama",
+    "eres meta", "eres claude", "eres gemini", "como te entrenaron",
+    "quien te desarrollo", "quien te programo", "tu creador"
   ];
-  return metaPatterns.some(p => lower.includes(p));
+  return patterns.some(p => lower.includes(p));
+}
+
+// Detecta saludos simples
+function isGreeting(text: string): boolean {
+  const lower = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  const greetings = ["hola", "buenos dias", "buenas tardes", "buenas noches", "que tal", "saludos"];
+  return greetings.some(g => lower === g || lower.startsWith(g + " ") || lower.endsWith(" " + g));
+}
+
+// Respuesta fija para identidad (sin pasar por el LLM)
+const IDENTITY_RESPONSE = `Soy **SUYD Legal AI**, un asistente legal especializado en las leyes de la República Dominicana.
+
+Fui creado por **Rafael José Cedano Rijo**, fundador de **SUYD**.
+
+Mi base de conocimiento incluye:
+- Constitución de la República Dominicana
+- Código de Trabajo (Ley 16-92)
+- Código Penal (Ley 550-14)
+
+¿En qué consulta legal puedo orientarte hoy?`;
+
+const GREETING_RESPONSE = `¡Hola! Soy **SUYD Legal AI**, tu asistente legal especializado en leyes de República Dominicana.
+
+¿En qué consulta legal puedo ayudarte hoy?`;
+
+// Función para devolver una respuesta fija como stream
+function fixedResponse(text: string): Response {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    start(controller) {
+      // Formato del data stream del Vercel AI SDK
+      const lines = text.split("");
+      let i = 0;
+      const interval = setInterval(() => {
+        if (i >= lines.length) {
+          controller.enqueue(encoder.encode(`d:{"finishReason":"stop","usage":{"promptTokens":0,"completionTokens":0}}\n`));
+          controller.close();
+          clearInterval(interval);
+          return;
+        }
+        const chunk = lines.slice(i, i + 3).join("");
+        i += 3;
+        controller.enqueue(encoder.encode(`0:${JSON.stringify(chunk)}\n`));
+      }, 10);
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "x-vercel-ai-data-stream": "v1",
+    },
+  });
 }
 
 export async function POST(req: Request) {
@@ -118,15 +170,19 @@ export async function POST(req: Request) {
 
   const lastUserMessage = userMessages[userMessages.length - 1] || "";
 
-  // 2. Si es una pregunta meta (identidad, saludo), NO hacer RAG
-  //    Esto evita que busque "rafael" o "quien" en las leyes y traiga basura
-  let relevantLaws: Array<{ source: string; content: string; similarity: number }> = [];
-
-  if (!isMetaQuestion(lastUserMessage)) {
-    // Solo hacer RAG para preguntas legales reales
-    const searchContext = userMessages.slice(-3).join(". ");
-    relevantLaws = await searchLaws(searchContext);
+  // 2. INTERCEPTAR preguntas de identidad - responder directamente sin LLM
+  if (isIdentityQuestion(lastUserMessage)) {
+    return fixedResponse(IDENTITY_RESPONSE);
   }
+
+  // 3. INTERCEPTAR saludos simples - responder directamente sin LLM
+  if (isGreeting(lastUserMessage)) {
+    return fixedResponse(GREETING_RESPONSE);
+  }
+
+  // 4. Para consultas legales reales, hacer RAG con contexto
+  const searchContext = userMessages.slice(-3).join(". ");
+  const relevantLaws = await searchLaws(searchContext);
 
   // 3. Construir el contexto con las leyes encontradas
   let legalContext = "";
