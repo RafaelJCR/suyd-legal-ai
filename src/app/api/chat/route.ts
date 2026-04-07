@@ -103,22 +103,39 @@ FORMATO:
 - Sugiere pasos concretos al final.
 - Si el caso es grave, recomienda un abogado presencial.`;
 
+// Detecta si la pregunta es sobre identidad/meta (no necesita RAG)
+function isMetaQuestion(text: string): boolean {
+  const lower = text.toLowerCase();
+  const metaPatterns = [
+    "quien te creo", "quien te creó", "quien te hizo",
+    "quien eres", "que eres", "como te llamas", "tu nombre",
+    "que modelo", "que ia", "chatgpt", "gpt", "llama", "meta",
+    "como funcionas", "como te entrenaron", "rafael",
+    "hola", "buenos dias", "buenas tardes", "buenas noches",
+    "gracias", "adios"
+  ];
+  return metaPatterns.some(p => lower.includes(p));
+}
+
 export async function POST(req: Request) {
   const { messages } = await req.json();
 
-  // 1. Construir un resumen de TODA la conversación para buscar mejor
-  //    ANTES: solo buscaba con el último mensaje ("como las consigo?")
-  //    AHORA: busca con el contexto completo ("bocinas + policía + campo + música alta")
+  // 1. Obtener el último mensaje del usuario
   const userMessages = messages
     .filter((m: { role: string }) => m.role === "user")
     .map((m: { content: string }) => m.content);
 
-  // Tomamos los últimos 3 mensajes del usuario para tener contexto
-  // sin exceder el límite del modelo de embeddings
-  const searchContext = userMessages.slice(-3).join(". ");
+  const lastUserMessage = userMessages[userMessages.length - 1] || "";
 
-  // 2. Buscar leyes relevantes usando el contexto completo
-  const relevantLaws = await searchLaws(searchContext);
+  // 2. Si es una pregunta meta (identidad, saludo), NO hacer RAG
+  //    Esto evita que busque "rafael" o "quien" en las leyes y traiga basura
+  let relevantLaws: Array<{ source: string; content: string; similarity: number }> = [];
+
+  if (!isMetaQuestion(lastUserMessage)) {
+    // Solo hacer RAG para preguntas legales reales
+    const searchContext = userMessages.slice(-3).join(". ");
+    relevantLaws = await searchLaws(searchContext);
+  }
 
   // 3. Construir el contexto con las leyes encontradas
   let legalContext = "";
