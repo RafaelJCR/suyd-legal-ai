@@ -17,7 +17,7 @@ El sistema procesa y analiza documentos legales reales, busca los articulos mas 
 Un usuario escribe una pregunta legal en lenguaje natural y el sistema:
 
 1. Convierte la consulta en un vector semantico (HuggingFace)
-2. Busca los fragmentos de ley mas relevantes en Supabase (pgvector)
+2. Busca los fragmentos juridicos mas relevantes en Supabase (pgvector)
 3. Envia el contexto legal + la pregunta al LLM (Groq / Llama 3.3 70B)
 4. Devuelve una respuesta fundamentada con citas a articulos especificos
 
@@ -64,6 +64,8 @@ Respuesta en streaming al usuario
 ---
 
 ## Base de conocimiento legal
+
+10 documentos juridicos dominicanos: codigos, leyes, decretos y la Constitucion.
 
 | Documento | Fragmentos |
 |-----------|-----------|
