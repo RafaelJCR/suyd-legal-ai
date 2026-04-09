@@ -1,36 +1,167 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SUYD Legal AI
 
-## Getting Started
+Asistente legal inteligente basado en **RAG (Retrieval-Augmented Generation)** que brinda orientacion juridica fundamentada en las leyes de la Republica Dominicana.
 
-First, run the development server:
+El sistema procesa y analiza documentos legales reales, busca los articulos mas relevantes a cada consulta y genera respuestas precisas con citas a la legislacion vigente.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
+![Groq](https://img.shields.io/badge/Groq-Llama_3.3_70B-orange)
+![Supabase](https://img.shields.io/badge/Supabase-pgvector-3FCF8E?logo=supabase&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)
+
+---
+
+## Que hace
+
+Un usuario escribe una pregunta legal en lenguaje natural y el sistema:
+
+1. Convierte la consulta en un vector semantico (HuggingFace)
+2. Busca los fragmentos de ley mas relevantes en Supabase (pgvector)
+3. Envia el contexto legal + la pregunta al LLM (Groq / Llama 3.3 70B)
+4. Devuelve una respuesta fundamentada con citas a articulos especificos
+
+Solo cita articulos que existen en los documentos recuperados. Nunca inventa referencias.
+
+---
+
+## Temas legales cubiertos
+
+- Derecho laboral (despidos, prestaciones, contratos)
+- Vivienda y alquiler (Decreto 4807 de Inquilinato)
+- Derecho penal y procesal penal
+- Derecho de familia (pension alimenticia, custodia)
+- Proteccion al consumidor (Ley 358-05)
+- Derechos constitucionales
+- Proteccion de ninos y adolescentes (Ley 136-03)
+- Violencia intrafamiliar (Ley 24-97)
+
+---
+
+## Arquitectura
+
+```
+Usuario
+  |
+  v
+Next.js Frontend (React 19 + Tailwind CSS)
+  |
+  v
+API Route (/api/chat)
+  |
+  +---> HuggingFace API (embeddings: all-MiniLM-L6-v2)
+  |         |
+  |         v
+  |     Supabase pgvector (busqueda semantica, top 8 chunks, >40% similitud)
+  |         |
+  |         v
+  +---> Groq API (Llama 3.3 70B, temp: 0.3)
+  |
+  v
+Respuesta en streaming al usuario
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Base de conocimiento legal
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Documento | Fragmentos |
+|-----------|-----------|
+| Codigo Civil | 976 |
+| Codigo de Trabajo | 1,445 |
+| Codigo Penal | 326 |
+| Codigo de Procedimiento Civil | 611 |
+| Codigo Procesal Penal | 359 |
+| Constitucion de la RD | 299 |
+| Decreto 4807 (Inquilinato) | 35 |
+| Ley 136-03 (Ninos y Adolescentes) | 518 |
+| Ley 24-97 (Violencia Intrafamiliar) | 69 |
+| Ley 358-05 (Proteccion al Consumidor) | 170 |
+| **Total** | **4,808 fragmentos** |
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## Stack tecnologico
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Capa | Tecnologia |
+|------|-----------|
+| Frontend | React 19, Next.js 16 (App Router), Tailwind CSS 4 |
+| LLM | Groq (Llama 3.3 70B Versatile) |
+| Embeddings | HuggingFace (sentence-transformers/all-MiniLM-L6-v2) |
+| Base de datos vectorial | Supabase con pgvector |
+| Monitoreo | Helicone (proxy para tracking de costos y latencia) |
+| Procesamiento de PDFs | pdfjs-dist |
+| Streaming | Vercel AI SDK |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## Instalacion local
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+# Clonar el repositorio
+git clone https://github.com/RafaelJCR/suyd-legal-ai.git
+cd suyd-legal-ai
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# Instalar dependencias
+npm install
+
+# Configurar variables de entorno
+cp .env.example .env.local
+```
+
+Variables de entorno necesarias:
+
+```env
+GROQ_API_KEY=
+NEXT_PUBLIC_SUPABASE_URL=
+SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_KEY=
+HUGGINGFACE_API_KEY=
+HELICONE_API_KEY=
+```
+
+```bash
+# Procesar PDFs legales (genera chunks)
+node scripts/process-laws.mjs
+
+# Subir chunks con embeddings a Supabase
+node scripts/upload-to-supabase.mjs
+
+# Iniciar el servidor de desarrollo
+npm run dev
+```
+
+Abrir [http://localhost:3000](http://localhost:3000)
+
+---
+
+## Pipeline de datos
+
+```
+PDFs en /data/laws/
+       |
+       v
+process-laws.mjs (extraccion + chunking ~1000 chars, overlap 200)
+       |
+       v
+/data/chunks.json (4,808 fragmentos)
+       |
+       v
+upload-to-supabase.mjs (embeddings + upload en batches de 20)
+       |
+       v
+Supabase pgvector (tabla law_chunks)
+```
+
+---
+
+## Autor
+
+**Rafael Jose Cedano Rijo** — Fundador de SUYD
+
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-rafaelcedanorijo-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/rafaelcedanorijo/)
+[![GitHub](https://img.shields.io/badge/GitHub-RafaelJCR-181717?logo=github&logoColor=white)](https://github.com/RafaelJCR)
+
+---
+
+> **Aviso:** Este asistente proporciona orientacion general y no sustituye la asesoria de un abogado licenciado.
